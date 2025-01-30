@@ -4,7 +4,7 @@ ii.columns: 5
 
 iii.function: ngram-fingerprint, 120
 
-iv.GREL_brandname: if(value == null, \"Unknown\", value)
+iv.GREL_brandname: if(value == null, "Unknown", value)
 
 v.GREL_highpriced: if(value.toNumber()>90,1,0)
 
