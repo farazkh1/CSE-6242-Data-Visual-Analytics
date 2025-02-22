@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<title>Wildlife Trafficking Choropleth Map</title>
+<script src="../lib/d3.v5.min.js"></script>
+<script src="../lib/topojson.v2.min.js"></script>
+<script src="../lib/d3-legend.min.js"></script>
+<script src="../lib/d3-tip.min.js"></script>
+<style>
+#tooltip {
+    position: absolute;
+    padding: 10px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    pointer-events: none;
+    font-family: sans-serif;
+    font-size: 12px;
+    opacity: 0;
+}
+
+.country {
+    stroke: #fff;
+    stroke-width: 0.5px;
+}
+
+.country:hover {
+    stroke-width: 2px;
+    stroke: black;
+}
+
+#yearDropdown {
+    margin: 20px;
+    padding: 5px;
+    font-size: 16px;
+}
+
+h1 {
+    text-align: center;
+    font-family: sans-serif;
+}
+</style>
+</head>
+<body>
+<h1>Wildlife Trafficking Incidents by Country</h1>
+<select id="yearDropdown"></select>
+<div id="tooltip"></div>
+
+<script>
+// Set margins and dimensions
+const margin = {top: 50, right: 50, bottom: 50, left: 50};
+const width = 960 - margin.left - margin.right;
+const height = 500 - margin.top - margin.bottom;
+
+// Create SVG
+const svg = d3.select("body")
+    .append("svg")
+    .attr("id", "choropleth")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom);
+
+// Create container for map
+const mapGroup = svg.append("g")
+    .attr("id", "countries")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+// Create legend group
+const legendGroup = svg.append("g")
+    .attr("id", "legend")
+    .attr("transform", `translate(${width - 120},${margin.top})`);
+
+// Define color scale with exact 4 gradations
+const colorScale = d3.scaleQuantile()
+    .range([
+        "#d0d1e6",  // Lightest blue
+        "#a6bddb",  // Light blue
+        "#74a9cf",  // Medium blue
+        "#2b8cbe"   // Darkest blue
+    ]);
+
+// Create tooltip
+const tooltip = d3.select("#tooltip");
+
+function showTooltip(d) {
+    const data = d.properties.traffickingData;
+    const content = data ? 
+        `Country: ${d.properties.name}<br>
+         Year: ${selectedYear}<br>
+         Incidents: ${data.Incidents}<br>
+         Average Fine: ${data["Average Fine"].toFixed(2)}<br>
+         Average Imprisonment: ${data["Average Imprisonment"].toFixed(2)}` :
+        `Country: ${d.properties.name}<br>
+         Year: ${selectedYear}<br>
+         Incidents: N/A<br>
+         Average Fine: N/A<br>
+         Average Imprisonment: N/A`;
+    
+    tooltip.html(content)
+        .style("left", (d3.event.pageX + 10) + "px")
+        .style("top", (d3.event.pageY - 10) + "px")
+        .style("opacity", 1);
+}
+
+function hideTooltip() {
+    tooltip.style("opacity", 0);
+}
+
+// Define projection and path
+const projection = d3.geoNaturalEarth1()
+    .scale(width / 2 / Math.PI)
+    .translate([width / 2, height / 2]);
+
+const path = d3.geoPath()
+    .projection(projection);
+
+let selectedYear;
+
+Promise.all([
+    d3.json("data/world_countries.json"),
+    d3.csv("data/wildlife_trafficking.csv", function(d) {
+        return {
+            Year: d.Year,
+            Country: d["Country of Incident"],
+            Incidents: +d["Number_of_Incidents"],
+            "Average Fine": +d["Average_Fine"],
+            "Average Imprisonment": +d["Average_Imprisonment"]
+        };
+    })
+]).then(function(data) {
+    ready(null, data[0], data[1]);
+}).catch(function(error) {
+    console.error("Error loading data:", error);
+});
+
+function ready(error, world, traffickingData) {
+    if (error) throw error;
+
+    // Get unique years and sort them
+    const years = [...new Set(traffickingData.map(d => d.Year))].sort();
+    selectedYear = years[0];
+
+    // Populate dropdown
+    const dropdown = d3.select("#yearDropdown")
+        .selectAll("option")
+        .data(years)
+        .enter()
+        .append("option")
+        .text(d => d)
+        .attr("value", d => d);
+
+    // Set initial selection
+    d3.select("#yearDropdown").property("value", selectedYear);
+
+    // Add event listener for dropdown
+    d3.select("#yearDropdown")
+        .on("change", function() {
+            selectedYear = this.value;
+            createMapAndLegend(world, traffickingData, selectedYear);
+        });
+
+    // Create initial map
+    createMapAndLegend(world, traffickingData, selectedYear);
+}
+
+function createMapAndLegend(world, traffickingData, selectedYear) {
+    // Filter data for selected year
+    const yearData = traffickingData.filter(d => d.Year === selectedYear);
+    
+    // Update color scale domain based on all incidents
+    const incidents = yearData.map(d => d.Incidents).filter(d => !isNaN(d) && d > 0);
+    colorScale.domain(incidents);
+
+    // Join trafficking data with geographic data
+    world.features.forEach(feature => {
+        feature.properties.traffickingData = yearData.find(d => 
+            d.Country === feature.properties.name
+        );
+    });
+
+    // Update map
+    const countries = mapGroup.selectAll("path")
+        .data(world.features);
+
+    // Enter new elements
+    countries.enter()
+        .append("path")
+        .attr("class", "country")
+        .merge(countries)
+        .attr("d", path)
+        .style("fill", d => {
+            const data = d.properties.traffickingData;
+            return data ? colorScale(data.Incidents) : "#cccccc";
+        })
+        .on("mouseover", showTooltip)
+        .on("mouseout", hideTooltip);
+
+    // Remove old elements
+    countries.exit().remove();
+
+    // Update legend
+    legendGroup.selectAll("*").remove();
+        
+    const legend = d3.legendColor()
+        .scale(colorScale)
+        .title("Incidents")
+        .shapeWidth(20)
+        .shapeHeight(20)
+        .cells(4)  // Explicitly specify 4 cells
+        .labelFormat(d3.format(".2f"))
+        .ascending(true);  // Ensure proper ordering
+
+    legendGroup.call(legend);
+
+    // Add username
+    svg.append("text")
+        .attr("x", width/2)
+        .attr("y", height + margin.bottom - 10)
+        .attr("text-anchor", "middle")
+        .text("GT Username"); // Add your GT username here
+}
+</script>
+</body>
+</html>

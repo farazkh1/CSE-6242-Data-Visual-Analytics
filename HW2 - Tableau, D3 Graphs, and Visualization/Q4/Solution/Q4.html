@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Games Rating: 2015-2019</title>
+    <meta charset="utf-8">
+    <style>
+      /* ----------------- General Styles ----------------- */
+      .line {
+        fill: none;
+        stroke-width: 2;
+      }
+      .legend-item {
+        font-size: 12px;
+      }
+      .data-point {
+        stroke-width: 1;
+        cursor: pointer;
+      }
+      .axis-label {
+        font-size: 12px;
+      }
+      .chart-title {
+        font-size: 16px;
+        font-weight: bold;
+      }
+      .credit {
+        font-size: 12px;
+      }
+      .grid line {
+        stroke: lightgrey;
+        stroke-opacity: 0.7;
+        shape-rendering: crispEdges;
+      }
+      .grid path {
+        stroke-width: 0;
+      }
+      .bar {
+        fill: steelblue;
+      }
+      /* Initially hide the bar chart elements */
+      #bar_chart,
+      #bar_chart_title {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- === LINE CHART SVG === -->
+    <svg id="line_chart" width="800" height="400">
+      <!-- Main container for line chart elements -->
+      <g id="container" transform="translate(60,60)">
+        <!-- Group for lines -->
+        <g id="lines"></g>
+        <!-- X-axis group -->
+        <g id="x-axis-lines" transform="translate(0,280)"></g>
+        <!-- Y-axis group -->
+        <g id="y-axis-lines"></g>
+        <!-- Group for circles -->
+        <g id="circles"></g>
+        <!-- Chart title and credit -->
+        <text id="line_chart_title" class="chart-title" x="370" y="-30">Board games by Rating 2015-2019</text>
+        <text id="credit" class="credit" x="370" y="-10">your GT Username</text> <!-- Add your GT username here -->
+        <!-- Legend group -->
+        <g id="legend" transform="translate(580,0)"></g>
+        <!-- Axis labels -->
+        <text class="axis-label" x="370" y="320" text-anchor="middle">Rating</text>
+        <text class="axis-label" transform="rotate(-90)" x="-140" y="-40" text-anchor="middle">Count</text>
+      </g>
+    </svg>
+
+    <!-- === BAR CHART TITLE (outside SVG) === -->
+    <div id="bar_chart_title"></div>
+    <!-- === BAR CHART SVG === -->
+    <svg id="bar_chart" width="800" height="250">
+      <!-- Main container for bar chart elements -->
+      <g id="container_2" transform="translate(150,60)">
+        <!-- Group for bars -->
+        <g id="bars"></g>
+        <!-- X-axis group for bar chart -->
+        <g id="x-axis-bars" transform="translate(0,190)"></g>
+        <!-- Y-axis group for bar chart -->
+        <g id="y-axis-bars"></g>
+        <!-- The x-axis and y-axis labels will be appended dynamically with proper IDs -->
+      </g>
+    </svg>
+
+    <!-- === SCRIPTS === -->
+    <script src="../lib/d3.v5.min.js"></script>
+    <script src="../lib/d3-dsv.min.js"></script>
+    <script>
+      /********** Configuration **********/
+      // For the line chart
+      const margin = { top: 60, right: 150, bottom: 50, left: 60 };
+      const width = 800 - margin.left - margin.right;
+      const height = 400 - margin.top - margin.bottom;
+      
+      // For the bar chart
+      const barMargin = { top: 60, right: 30, bottom: 50, left: 150 };
+      const barWidth = 800 - barMargin.left - barMargin.right;  // 800 - 150 - 30 = 620
+      const barHeight = 250 - barMargin.top - barMargin.bottom;  // 250 - 60 - 50 = 140
+      
+      /********** Select Groups **********/
+      // Line chart groups (inside #container)
+      const container = d3.select("#container");
+      const linesGroup = container.select("#lines");
+      const xAxisGroup = container.select("#x-axis-lines");
+      const yAxisGroup = container.select("#y-axis-lines");
+      const circlesGroup = container.select("#circles");
+      const legendGroup = d3.select("#legend");
+      
+      // Bar chart groups (inside #container_2)
+      const container2 = d3.select("#container_2");
+      const barsGroup = container2.select("#bars");
+      const xAxisBarsGroup = container2.select("#x-axis-bars");
+      const yAxisBarsGroup = container2.select("#y-axis-bars");
+      
+      // Color scale for line chart (by year)
+      const colorScale = d3.scaleOrdinal()
+                           .domain(['2015', '2016', '2017', '2018', '2019'])
+                           .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']);
+      
+      /********** Bar Chart Update Function **********/
+      function updateBarChart(dataSubset, year, rating) {
+        // If no games exist for this (year, rating) combination, hide the bar chart.
+        if (dataSubset.length === 0) {
+          d3.select("#bar_chart_title").style("display", "none");
+          d3.select("#bar_chart").style("display", "none");
+          return;
+        }
+        
+        // Show bar chart and update its title (all lower-case as expected)
+        d3.select("#bar_chart_title")
+          .style("display", "block")
+          .text(`top 5 most rated games of ${year} with rating ${rating}`);
+        d3.select("#bar_chart").style("display", "block");
+        
+        // Clear any previous bar chart content
+        barsGroup.selectAll("*").remove();
+        xAxisBarsGroup.selectAll("*").remove();
+        yAxisBarsGroup.selectAll("*").remove();
+        container2.selectAll("#bar_x_axis_label").remove();
+        container2.selectAll("#bar_y_axis_label").remove();
+        
+        // Sort the data in descending order so that the highest-rated game is at the top
+        dataSubset.sort((a, b) => b.users_rated - a.users_rated);
+        
+        // Create scales for the bar chart
+        const xScale = d3.scaleLinear()
+                         .domain([0, d3.max(dataSubset, d => d.users_rated)])
+                         .range([0, barWidth]);
+                         
+        const yScale = d3.scaleBand()
+                         .domain(dataSubset.map(d => d.name.substring(0, 10)))
+                         .range([0, barHeight])
+                         .padding(0.1);
+        
+        // Append grid lines to the x-axis group
+        xAxisBarsGroup.append("g")
+                      .attr("class", "grid")
+                      .call(d3.axisBottom(xScale)
+                              .tickSize(-barHeight)
+                              .tickFormat(""));
+        
+        // Append the bars (all with uniform color "steelblue")
+        barsGroup.selectAll("rect")
+                 .data(dataSubset)
+                 .enter()
+                 .append("rect")
+                 .attr("class", "bar")
+                 .attr("x", 0)
+                 .attr("y", d => yScale(d.name.substring(0, 10)))
+                 .attr("width", d => xScale(d.users_rated))
+                 .attr("height", yScale.bandwidth())
+                 .attr("fill", "steelblue");
+        
+        // Append the actual x-axis (over the grid lines)
+        xAxisBarsGroup.call(d3.axisBottom(xScale));
+        
+        // Append the y-axis
+        yAxisBarsGroup.call(d3.axisLeft(yScale));
+        
+        // Append x-axis label with the required id "bar_x_axis_label"
+        container2.append("text")
+                  .attr("id", "bar_x_axis_label")
+                  .attr("class", "axis-label")
+                  .attr("x", barWidth / 2)
+                  .attr("y", barHeight + 40)
+                  .attr("text-anchor", "middle")
+                  .text("number of users");
+        
+        // Append y-axis label with the required id "bar_y_axis_label"
+        container2.append("text")
+                  .attr("id", "bar_y_axis_label")
+                  .attr("class", "axis-label")
+                  .attr("transform", "rotate(-90)")
+                  .attr("x", -barHeight / 2)
+                  .attr("y", -barMargin.left + 20)
+                  .attr("text-anchor", "middle")
+                  .text("games");
+      }
+      
+      /********** Load and Process Data **********/
+      const csvPath = "average-rating.csv";
+      d3.dsv(",", csvPath, function(d) {
+        return {
+          year: d.year,
+          rating: Math.floor(+d.average_rating),
+          name: d.name,
+          users_rated: +d.users_rated
+        };
+      }).then(function(data) {
+        // Filter data to only include years 2015-2019
+        data = data.filter(d => d.year >= 2015 && d.year <= 2019);
+        
+        // Prepare data for the line chart by grouping by year and rating
+        const nestedData = d3.nest()
+                             .key(d => d.year)
+                             .key(d => d.rating)
+                             .rollup(v => v.length)
+                             .entries(data);
+        
+        // Build a complete dataset for all ratings for each year
+        const completeData = [];
+        const years = ['2015', '2016', '2017', '2018', '2019'];
+        const allRatings = d3.range(0, d3.max(data, d => d.rating) + 1);
+        
+        years.forEach(year => {
+          const yearData = nestedData.find(d => d.key === year) || { values: [] };
+          allRatings.forEach(rating => {
+            const ratingData = yearData.values.find(d => +d.key === rating);
+            completeData.push({
+              year: year,
+              rating: rating,
+              count: ratingData ? ratingData.value : 0
+            });
+          });
+        });
+        
+        // Create scales for the line chart
+        const xScaleLine = d3.scaleLinear()
+                             .domain([0, d3.max(allRatings)])
+                             .range([0, width]);
+                             
+        const yScaleLine = d3.scaleLinear()
+                             .domain([0, d3.max(completeData, d => d.count)])
+                             .range([height, 0]);
+        
+        // Create a line generator
+        const lineGenerator = d3.line()
+                                .x(d => xScaleLine(d.rating))
+                                .y(d => yScaleLine(d.count));
+        
+        // For each year, plot the line and the circles for data points
+        years.forEach(year => {
+          const yearData = completeData.filter(d => d.year === year);
+          yearData.sort((a, b) => a.rating - b.rating);
+          
+          // Append the line for this year
+          linesGroup.append("path")
+                    .datum(yearData)
+                    .attr("class", "line")
+                    .attr("d", lineGenerator)
+                    .style("stroke", colorScale(year));
+          
+          // Append circles and add interactivity
+          circlesGroup.selectAll(`circle_${year}`)
+                      .data(yearData)
+                      .enter()
+                      .append("circle")
+                      .attr("class", "data-point")
+                      .attr("cx", d => xScaleLine(d.rating))
+                      .attr("cy", d => yScaleLine(d.count))
+                      .attr("r", 4)
+                      .style("fill", colorScale(year))
+                      .on("mouseover", function(d) {
+                        // Enlarge the circle on hover
+                        d3.select(this)
+                          .transition()
+                          .duration(200)
+                          .attr("r", 8);
+                        // Filter to get the top 5 games (sorted by users_rated) for the given year and rating
+                        const topGames = data
+                          .filter(game => game.year === d.year && game.rating === d.rating)
+                          .sort((a, b) => b.users_rated - a.users_rated)
+                          .slice(0, 5);
+                        updateBarChart(topGames, d.year, d.rating);
+                      })
+                      .on("mouseout", function() {
+                        d3.select(this)
+                          .transition()
+                          .duration(200)
+                          .attr("r", 4);
+                        // Hide the bar chart on mouseout
+                        d3.select("#bar_chart_title").style("display", "none");
+                        d3.select("#bar_chart").style("display", "none");
+                      });
+        });
+        
+        // Append axes for the line chart
+        const xAxisLine = d3.axisBottom(xScaleLine);
+        const yAxisLine = d3.axisLeft(yScaleLine);
+        xAxisGroup.call(xAxisLine);
+        yAxisGroup.call(yAxisLine);
+        
+        // Append the legend for the line chart
+        years.forEach((year, i) => {
+          const legendItem = legendGroup.append("g")
+                              .attr("transform", `translate(0, ${i * 20})`);
+          legendItem.append("circle")
+                    .attr("r", 4)
+                    .style("fill", colorScale(year));
+          legendItem.append("text")
+                    .attr("x", 10)
+                    .attr("y", 4)
+                    .attr("class", "legend-item")
+                    .text(year);
+        });
+      }).catch(function(error) {
+        console.error(error);
+      });
+    </script>
+  </body>
+</html>

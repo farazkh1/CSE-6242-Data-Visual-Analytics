@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<head>
+<style>
+path.link {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5px;
+}
+
+path.link.similar {
+  stroke: gray;
+  stroke-width: 3px;
+  stroke-dasharray: none;
+}
+
+path.link.dissimilar {
+  stroke: green;
+  stroke-width: 1.5px;
+  stroke-dasharray: 4;
+}
+
+circle {
+  stroke: #fff;
+  stroke: black;
+  stroke-width: 1.5px;
+}
+
+circle.pinned {
+  fill: #ff7f0e !important; /* Orange color for pinned nodes, override default color */
+}
+
+text {
+  fill: #000;
+  font: 10px sans-serif;
+  pointer-events: none;
+  font-weight: bold;
+}
+
+text.credit {
+  font-size: 14px;
+  fill: #666;
+}
+</style>
+<meta charset="utf-8">
+<title>Network Graph</title>
+</head>
+<body>
+<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<script>
+d3.dsv(",", "board_games.csv", function(d) {
+  return {
+    source: d.source,
+    target: d.target,
+    value: +d.value
+  }
+}).then(function(data) {
+  var links = data;
+  var nodes = {};
+
+  // Compute nodes and calculate degrees
+  links.forEach(function(link) {
+    link.source = nodes[link.source] || (nodes[link.source] = {name: link.source, degree: 0, fixed: false});
+    link.target = nodes[link.target] || (nodes[link.target] = {name: link.target, degree: 0, fixed: false});
+    nodes[link.source.name].degree++;
+    nodes[link.target.name].degree++;
+  });
+
+  var nodesArray = Object.values(nodes);
+  var minDegree = d3.min(nodesArray, d => d.degree);
+  var maxDegree = d3.max(nodesArray, d => d.degree);
+
+  // Increase minimum radius for better click detection
+  var radiusScale = d3.scaleSqrt()
+    .domain([minDegree, maxDegree])
+    .range([8, 20]); // Increased minimum and maximum radius
+
+  var colorScale = d3.scaleSequential(d3.interpolateBlues)
+    .domain([minDegree, maxDegree]);
+
+  var width = 1200,
+      height = 700;
+
+  var force = d3.forceSimulation()
+    .nodes(d3.values(nodes))
+    .force("link", d3.forceLink(links).distance(100))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force("x", d3.forceX())
+    .force("y", d3.forceY())
+    .force("charge", d3.forceManyBody().strength(-250))
+    .alphaTarget(1)
+    .on("tick", tick);
+
+  var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  // Add GT username to top right
+  svg.append("text")
+    .attr("id", "credit")
+    .attr("class", "credit")
+    .attr("x", width - 100)
+    .attr("y", 30)
+    .text("your GT username"); // Replace with actual GT username
+
+  var path = svg.append("g")
+    .selectAll("path")
+    .data(links)
+    .enter()
+    .append("path")
+    .attr("class", function(d) { 
+      return "link " + (d.value === 0 ? "similar" : "dissimilar");
+    });
+
+  var node = svg.selectAll(".node")
+    .data(force.nodes())
+    .enter().append("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+
+  // Add circles with scaled radius and color
+  node.append("circle")
+    .attr("id", function(d){
+      return (d.name.replace(/\s+/g,'').toLowerCase());
+    })
+    .attr("r", function(d) {
+      return radiusScale(d.degree);
+    })
+    .style("fill", function(d) {
+      return colorScale(d.degree);
+    })
+    // Add double-click handler for unpinning
+    .on("dblclick", function(d) {
+      d.fixed = false;
+      d.fx = null;
+      d.fy = null;
+      d3.select(this).classed("pinned", false);
+    });
+
+  // Add labels with smaller font size
+  node.append("text")
+    .attr("dx", function(d) {
+      return radiusScale(d.degree) + 3;
+    })
+    .attr("dy", -8)
+    .style("font-size", "8px") // Reduced font size
+    .text(function(d) { return d.name; });
+
+  // Add legend
+  var legendHeight = 200;
+  var legendWidth = 20;
+  
+  var legend = svg.append("g")
+    .attr("class", "legend")
+    .attr("transform", "translate(50,50)");
+
+  var gradient = legend.append("defs")
+    .append("linearGradient")
+    .attr("id", "gradient")
+    .attr("x1", "0%")
+    .attr("y1", "100%")
+    .attr("x2", "0%")
+    .attr("y2", "0%");
+
+  var colorStops = [0, 0.5, 1];
+  colorStops.forEach(function(stop) {
+    gradient.append("stop")
+      .attr("offset", stop * 100 + "%")
+      .attr("stop-color", colorScale(minDegree + (maxDegree - minDegree) * stop));
+  });
+
+  legend.append("rect")
+    .attr("width", legendWidth)
+    .attr("height", legendHeight)
+    .style("fill", "url(#gradient)");
+
+  legend.append("text")
+    .attr("x", legendWidth + 5)
+    .attr("y", legendHeight)
+    .text("Low Degree (" + minDegree + ")");
+
+  legend.append("text")
+    .attr("x", legendWidth + 5)
+    .attr("y", 0)
+    .attr("dy", "0.75em")
+    .text("High Degree (" + maxDegree + ")");
+
+  function tick() {
+    path.attr("d", function(d) {
+      var dx = d.target.x - d.source.x,
+          dy = d.target.y - d.source.y,
+          dr = Math.sqrt(dx * dx + dy * dy);
+      return "M" +
+        d.source.x + "," +
+        d.source.y + "A" +
+        dr + "," + dr + " 0 0,1 " +
+        d.target.x + "," +
+        d.target.y;
+    });
+
+    node.attr("transform", function(d) {
+      return "translate(" + d.x + "," + d.y + ")";
+    });
+  }
+
+  function dragstarted(d) {
+    if (!d3.event.active) force.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(d) {
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+  }
+
+  function dragended(d) {
+    if (!d3.event.active) force.alphaTarget(0);
+    // Pin the node after dragging
+    d.fixed = true;
+    d.fx = d.x;
+    d.fy = d.y;
+    // Add pinned class to change color
+    d3.select(this).select("circle").classed("pinned", true);
+  }
+}).catch(function(error) {
+  console.log(error);
+});
+</script>
+</body>
+</html>

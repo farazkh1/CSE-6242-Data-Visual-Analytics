@@ -1,0 +1,20 @@
+.title {
+    text-anchor: middle;
+    font: bold 16px sans-serif;
+}
+
+.label {
+    text-anchor: middle;
+    font: 14px sans-serif;
+}
+
+.legend {
+    text-anchor: start;
+    font: 11px sans-serif;
+}
+
+.rank {
+    text-anchor: middle;
+    font: 8px sans-serif;
+    fill: white;
+}
