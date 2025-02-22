@@ -15,6 +15,15 @@
   - Implement a choropleth map using D3 to analyze board game ratings across different countries.  
   - Enable interactivity with hovering, filtering, and updating visualizations dynamically.  
 
+### Homework 3: Large-Scale Data Processing with Spark, Docker, AWS, and GCP.  
+- **Tasks:**  
+  - Analyze NYC taxi trip data using PySpark within a Docker container.  
+  - Process large-scale datasets using Spark/Scala on Databricks.  
+  - Utilize AWS services, including Athena and S3, for distributed computing with PySpark.  
+  - Implement cloud-based data analysis on Google Cloud Platform using Dataproc and Spark.
+ 
+### Homework 4: to come...   
+
 ### Educational Note:  
 This repository contains solutions for learning purposes. Please do not simply copy; use this as a resource to understand and improve your data visualization and coding skills.
 
