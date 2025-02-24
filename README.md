@@ -1,5 +1,3 @@
-**GitHub Repository Description:**
-
 ## CSE 6242 / CX 4242: Data and Visual Analytics - Georgia Tech, Spring 2025  
 
 ### Homework 1: Dive into TMDb data analysis with tools like SQLite, D3, OpenRefine, and Flask.  
