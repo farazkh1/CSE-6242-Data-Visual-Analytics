@@ -1,0 +1,11 @@
+PULocationID,PUZone,DOLocationID,DOZone,trip_count,avg_total_fare
+237,Upper East Side South,236,Upper East Side North,359114,9.98
+236,Upper East Side North,237,Upper East Side South,297651,10.59
+237,Upper East Side South,162,Midtown East,166668,10.42
+239,Upper West Side South,238,Upper West Side North,155931,8.95
+237,Upper East Side South,161,Midtown Center,155542,11.71
+239,Upper West Side South,142,Lincoln Square East,153014,9.38
+238,Upper West Side North,239,Upper West Side South,146395,8.85
+141,Lenox Hill West,236,Upper East Side North,138760,9.91
+142,Lincoln Square East,239,Upper West Side South,137855,9.82
+186,Penn Station/Madison Sq West,161,Midtown Center,128743,12.98
