@@ -20,7 +20,7 @@
   - Utilize AWS services, including Athena and S3, for distributed computing with PySpark.  
   - Implement cloud-based data analysis on Google Cloud Platform using Dataproc and Spark.
  
-### Homework 4: to come...   
+### Homework 4: PageRank Algorithm, Random Forest, Scikit-learn.
 
 ### Educational Note:  
 This repository contains solutions for learning purposes. Please do not simply copy; use this as a resource to understand and improve your data visualization and coding skills.
