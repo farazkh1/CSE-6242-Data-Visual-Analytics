@@ -21,6 +21,12 @@
   - Implement cloud-based data analysis on Google Cloud Platform using Dataproc and Spark.
  
 ### Homework 4: PageRank Algorithm, Random Forest, Scikit-learn.
+- **Tasks:**  
+  - Implement the PageRank algorithm from scratch to model web surfing behavior.
+  - Compute probability distributions for webpages based on link structures.
+  - Develop a Random Forest classifier from scratch to estimate class probabilities.
+  - Train and evaluate classification models using decision trees and ensemble methods.
+  - Utilize scikit-learn to specify and fit various supervised and unsupervised machine learning models.
 
 ### Educational Note:  
 This repository contains solutions for learning purposes. Please do not simply copy; use this as a resource to understand and improve your data visualization and coding skills.
